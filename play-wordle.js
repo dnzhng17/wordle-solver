@@ -1,6 +1,6 @@
 import fs from "fs";
 import readline from "readline-sync";
-import { init, processGuess, printIcons, getCurrentListLength} from "./solver.js";
+import { init, getCurrentWordlist, processGuess, processGuessWithoutSuggestion, printIcons, getCurrentListLength, findBestGuess} from "./solver.js";
 
 let gameMode = "";
 let runMode = "";
@@ -43,7 +43,7 @@ const getFeedback = (answer, guess) => {
 
 // select game mode
 while (gameMode !== "wordle" && gameMode !== "wardle") {
-    gameMode = readline.question("\nwordle or wardle? (wordle/wardle): ");
+    gameMode = readline.question("\nwordle or wardle?: ");
 }
 
 // init based on game mode
@@ -68,11 +68,11 @@ rawList.forEach((wordValue) => {
 });
 
 // selecting run mode
-while (runMode !== "single" && runMode !== "benchmark") {
-    runMode = readline.question("\nsingle game mode or benchmarking mode? (single/benchmark): ");
+while (runMode !== "s" && runMode !== "b" && runMode !== "p") {
+    runMode = readline.question("\n[s]ingle game mode, [p]arallel game mode, or [b]enchmarking mode?: ");
 }
 
-if (runMode === "single") {
+if (runMode === "s") {
     // single game mode
     let found = false;
     init(answerList, wordLength);
@@ -86,11 +86,11 @@ if (runMode === "single") {
         for (let i = 0; i < wordLength; i++) {
             fbk += "gn ";
         }
-        processGuess(startingGuess.value, fbk);
+        processGuessWithoutSuggestion(startingGuess.value, fbk);
     }
     while (!found) {
-        let lastGuess = readline.question("type in last guess: ");
-        let feedback = readline.question("type in last result (gn/yw/gy): ");
+        let lastGuess = readline.question("last guess: ");
+        let feedback = readline.question("last result (gn/yw/gy): ");
         
         let nextGuess = processGuess(lastGuess, feedback);
         printIcons();
@@ -110,6 +110,62 @@ if (runMode === "single") {
     printIcons();
     console.log("woohoo!");
 
+} else if (runMode === "p") {
+    // parallel game mode
+    let found = false;
+    init(answerList, wordLength);
+    console.log("\n-------------------------\nstarting new " + gameMode + " game!\n-------------------------");
+    //console.log("\nbest starting guess: " + startingGuess.value + " (score: " + startingGuess.score + ", remaining words: " + getCurrentListLength() + ")");
+    
+
+    let numGuesses = -1;
+    while (numGuesses < 1) {
+        numGuesses = readline.question("\nguesses so far: ");
+    }
+
+    let oldGuesses = 0;
+    while (oldGuesses < (numGuesses - 1) && !found) {
+        let q = "\nguess #" + (++oldGuesses) + ": ";
+        let og = readline.question(q)
+        let of = readline.question("result (gn/yw/gy): ");
+        processGuessWithoutSuggestion(og, of);
+        let numLeft = getCurrentListLength(); 
+        if (numLeft === 1) {
+            found = true;
+            let nextGuess = findBestGuess(getCurrentWordlist());
+            console.log("\nonly one option left: " + nextGuess.value);
+            
+            let fbk = "";
+            for (let i = 0; i < wordLength; i++) {
+                fbk += "gn ";
+            }
+            processGuessWithoutSuggestion(nextGuess.value, fbk);
+        } else {
+            console.log("remaining words: " + numLeft);
+        }
+    }
+ 
+    while (!found) {
+        let lastGuess = readline.question("\nlast guess: ");
+        let feedback = readline.question("last result (gn/yw/gy): ");
+        
+        let nextGuess = processGuess(lastGuess, feedback);
+        printIcons();
+        console.log("next best guess: " + nextGuess.value + " (score: " + nextGuess.score + ", remaining words: " + getCurrentListLength() + ")");
+        
+        let didFind = readline.question("did you find it? (y/n): ");
+        if (didFind === "y") {
+            found = true;
+            let fbk = "";
+            for (let i = 0; i < wordLength; i++) {
+                fbk += "gn ";
+            }
+            processGuessWithoutSuggestion(nextGuess.value, fbk);
+        }
+    }
+
+    printIcons();
+    console.log("woohoo!");
 } else {
     // benchmarking mode
     let verbosity = "";

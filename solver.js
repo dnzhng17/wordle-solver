@@ -88,6 +88,10 @@ const filterList = (list, criteria) => {
     return workingList;
 }
 
+export const getCurrentWordlist = () => {
+    return currentWordlist;
+}
+
 const calculateScore = (word, depth, list, population) => {
     let colours = ["gn", "yw", "gy"];
     let score = 0;
@@ -173,6 +177,11 @@ export const printIcons = () => {
 };
 
 export const processGuess = (guess, feedback) => {
+    processGuessWithoutSuggestion(guess, feedback);
+    return findBestGuess(currentWordlist);
+}
+
+export const processGuessWithoutSuggestion = (guess, feedback) => {
     let splitFeedback = feedback.split(" ");
     previousGuesses.push(guess);
 
@@ -188,7 +197,6 @@ export const processGuess = (guess, feedback) => {
     currentCriteria = currentCriteria.concat(newCriteria);
     // console.log(currentCriteria);
     currentWordlist = filterList(currentWordlist, currentCriteria);
-    return findBestGuess(currentWordlist);
 }
 
 export const getCurrentListLength = () => {
