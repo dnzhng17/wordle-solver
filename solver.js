@@ -15,78 +15,94 @@ export const init = (list, length) => {
 }
 
 const filterList = (list, criteria) => {
-    let workingList = list;
-    let filteredList = [];
-    criteria.forEach((crit) => {
-        switch (crit.type) {
-            case "gn":
-                workingList.forEach((word) => {
-                    if (word.value[crit.index] === crit.letter) {
-                        filteredList.push(word);
-                    }
-                });
-                break;
-            case "yw":
-                workingList.forEach((word) => {
-                    if ((word.value[crit.index] !== crit.letter) && (word.value.includes(crit.letter))) {
-                        filteredList.push(word);
-                    }
-                });
-                break;
-            case "gy":
-                workingList.forEach((word) => {
-                    if (crit.exception && (crit.exception.length > 0)) {
-                        let safe = true;
-                        let hasYellow = false;
-                        let greens = [];
-                        crit.exception.forEach((ex) => {
-                            if (ex.exceptionType === "yellow") {
-                                hasYellow = true;
-                            } else {
-                                greens.push(ex.exceptionIndex);
-                            }
-                        });
-                        if (!hasYellow) {
-                            // if yellow, check that there are n of this letter equal to the number of exceptions
-                            let count = 0;
-                            for (let k = 0; k < maxDepth + 1; k++) {
-                                if (word.value[k] === crit.letter) {
-                                    count++;
-                                }
-                            }
-                            if (count > crit.exception.length) {
-                                safe = false;
-                            }
-                        } else {
-                            // if all green, check that there are none of this letter outside of the greens
-                            for (let k = 0; k < maxDepth + 1; k++) {
-                                if (greens.includes(k)) continue;
-                                if (word.value[k] === crit.letter) {
-                                    safe = false;
-                                }
-                            }
-                        }
-
-                        if (safe) {
-                            filteredList.push(word);
-                        }
-                        
-                    } else {
-                        if (!word.value.includes(crit.letter)) {
-                            filteredList.push(word);
-                        }
-                    }
-                });
-                break;
-            default:
-                console.log("error! should never happen");
-                break;
+    return list.filter(word => {
+        // Group criteria by letter for easier processing
+        const letterInfo = {};
+        
+        // Initialize letter tracking
+        for (const crit of criteria) {
+            if (!letterInfo[crit.letter]) {
+                letterInfo[crit.letter] = {
+                    greenPositions: new Set(),
+                    yellowPositions: new Set(),
+                    grayPositions: new Set(),
+                    minCount: 0
+                };
+            }
+            
+            if (crit.type === "gn") {
+                letterInfo[crit.letter].greenPositions.add(crit.index);
+                // For green, we know there's at least one
+                letterInfo[crit.letter].minCount = Math.max(
+                    letterInfo[crit.letter].minCount,
+                    letterInfo[crit.letter].greenPositions.size
+                );
+            } else if (crit.type === "yw") {
+                letterInfo[crit.letter].yellowPositions.add(crit.index);
+                // For yellow, we know there's at least green + 1
+                letterInfo[crit.letter].minCount = Math.max(
+                    letterInfo[crit.letter].minCount,
+                    letterInfo[crit.letter].greenPositions.size + 1
+                );
+            } else if (crit.type === "gy") {
+                letterInfo[crit.letter].grayPositions.add(crit.index);
+                // Gray doesn't increase minimum count
+            }
         }
-        workingList = filteredList;
-        filteredList = [];
+        
+        // Now check each letter's requirements
+        for (const letter in letterInfo) {
+            const info = letterInfo[letter];
+            
+            // 1. All green positions must have this letter
+            for (const pos of info.greenPositions) {
+                if (word.value[pos] !== letter) {
+                    return false;
+                }
+            }
+            
+            // 2. No yellow positions can have this letter
+            for (const pos of info.yellowPositions) {
+                if (word.value[pos] === letter) {
+                    return false;
+                }
+            }
+            
+            // 3. Count occurrences in the word
+            let occurrences = 0;
+            for (let i = 0; i < word.value.length; i++) {
+                if (word.value[i] === letter) {
+                    occurrences++;
+                }
+            }
+            
+            // 4. Must have at least the minimum required count
+            if (occurrences < info.minCount) {
+                return false;
+            }
+            
+            // 5. If we have gray positions and no exceptions, 
+            // the count must be exactly the minimum
+            if (info.grayPositions.size > 0) {
+                let hasException = false;
+                
+                // Check if any gray has exceptions
+                for (const crit of criteria) {
+                    if (crit.type === "gy" && crit.letter === letter && crit.exception) {
+                        hasException = true;
+                        break;
+                    }
+                }
+                
+                if (!hasException && occurrences > info.minCount) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
     });
-    return workingList;
-}
+};
 
 export const getCurrentWordlist = () => {
     return currentWordlist;
